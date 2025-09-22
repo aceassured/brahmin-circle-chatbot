@@ -10,6 +10,12 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// --- Define Headers for OpenRouter ---
+const openRouterHeaders = {
+    "HTTP-Referer": `https://brahmin-circle-chatbot.onrender.com/`,
+    "X-Title": `Brahmin Circle Chatbot`,
+};
+
 // Neon / Postgres connection
 const client = new pg.Client({
     connectionString: process.env.NEON_DB_URL,
@@ -17,12 +23,8 @@ const client = new pg.Client({
 await client.connect();
 console.log("Connected to Neon DB ✅");
 
-// Helper: Get embeddings from OpenRouter (compatible with OpenAI endpoints)
-// THIS IS THE UPDATED FUNCTION WITH DETAILED ERROR LOGGING
+// Helper: Get embeddings from OpenRouter
 async function getEmbedding(text) {
-    // --- ADD THESE TWO NEW LINES FOR DEBUGGING ---
-    console.log(`Attempting to use Embedding Model: [${process.env.EMBEDDING_MODEL}]`);
-    console.log(`Is API Key present? [${!!process.env.OPENROUTER_API_KEY}]`);
     try {
         const response = await axios.post(
             "https://openrouter.ai/api/v1/embeddings",
@@ -31,28 +33,26 @@ async function getEmbedding(text) {
                 input: text,
             },
             {
-                headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
+                headers: {
+                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    ...openRouterHeaders,
+                },
             }
         );
 
-        // Check if the response structure is valid before accessing it
         if (response.data && response.data.data && response.data.data.length > 0) {
             return response.data.data[0].embedding;
         } else {
-            // If the structure is not what we expect, log it and fail.
             console.error("Unexpected response structure from OpenRouter:", response.data);
             throw new Error("Failed to get embedding from OpenRouter.");
         }
     } catch (error) {
-        // This block will catch API errors (like bad API keys)
-        console.error("Error calling OpenRouter API:");
-        // Log the detailed error message from the API
+        console.error("Error calling OpenRouter API for embeddings:");
         if (error.response) {
             console.error(JSON.stringify(error.response.data, null, 2));
         } else {
             console.error(error.message);
         }
-        // Re-throw the error so the main process knows it failed
         throw error;
     }
 }
@@ -89,8 +89,9 @@ app.post("/chat", async (req, res) => {
             },
             {
                 headers: {
-                    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json",
+                    ...openRouterHeaders,
                 },
             }
         );
@@ -98,7 +99,6 @@ app.post("/chat", async (req, res) => {
         const reply = completion.data.choices[0].message.content;
         res.json({ reply });
     } catch (err) {
-        // We don't log the error here anymore because the getEmbedding function already did.
         res.status(500).json({ error: "Something went wrong" });
     }
 });
