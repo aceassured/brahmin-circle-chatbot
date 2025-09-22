@@ -18,20 +18,42 @@ await client.connect();
 console.log("Connected to Neon DB ✅");
 
 // Helper: Get embeddings from OpenRouter (compatible with OpenAI endpoints)
+// THIS IS THE UPDATED FUNCTION WITH DETAILED ERROR LOGGING
 async function getEmbedding(text) {
-    const response = await axios.post(
-        "https://openrouter.ai/api/v1/embeddings",
-        {
-            model: process.env.EMBEDDING_MODEL,
-            input: text,
-        },
-        {
-            headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
-        }
-    );
+    try {
+        const response = await axios.post(
+            "https://openrouter.ai/api/v1/embeddings",
+            {
+                model: process.env.EMBEDDING_MODEL,
+                input: text,
+            },
+            {
+                headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
+            }
+        );
 
-    return response.data.data[0].embedding;
+        // Check if the response structure is valid before accessing it
+        if (response.data && response.data.data && response.data.data.length > 0) {
+            return response.data.data[0].embedding;
+        } else {
+            // If the structure is not what we expect, log it and fail.
+            console.error("Unexpected response structure from OpenRouter:", response.data);
+            throw new Error("Failed to get embedding from OpenRouter.");
+        }
+    } catch (error) {
+        // This block will catch API errors (like bad API keys)
+        console.error("Error calling OpenRouter API:");
+        // Log the detailed error message from the API
+        if (error.response) {
+            console.error(JSON.stringify(error.response.data, null, 2));
+        } else {
+            console.error(error.message);
+        }
+        // Re-throw the error so the main process knows it failed
+        throw error;
+    }
 }
+
 
 // Helper: Search Neon for top 3 similar documents
 async function searchNeon(query) {
@@ -73,7 +95,7 @@ app.post("/chat", async (req, res) => {
         const reply = completion.data.choices[0].message.content;
         res.json({ reply });
     } catch (err) {
-        console.error(err);
+        // We don't log the error here anymore because the getEmbedding function already did.
         res.status(500).json({ error: "Something went wrong" });
     }
 });
