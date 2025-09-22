@@ -20,6 +20,9 @@ console.log("Connected to Neon DB ✅");
 // Helper: Get embeddings from OpenRouter (compatible with OpenAI endpoints)
 // THIS IS THE UPDATED FUNCTION WITH DETAILED ERROR LOGGING
 async function getEmbedding(text) {
+    // --- ADD THESE TWO NEW LINES FOR DEBUGGING ---
+    console.log(`Attempting to use Embedding Model: [${process.env.EMBEDDING_MODEL}]`);
+    console.log(`Is API Key present? [${!!process.env.OPENROUTER_API_KEY}]`);
     try {
         const response = await axios.post(
             "https://openrouter.ai/api/v1/embeddings",
